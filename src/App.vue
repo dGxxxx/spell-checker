@@ -67,7 +67,7 @@ textarea {
 	text-align: start;
 
 	height: 90%;
-	width: 409px;
+	width: 100%;
 
 	resize: none;
 	border: 0;
@@ -143,7 +143,7 @@ button:hover {
 	font-style: normal;
 	color: rgb(37, 37, 37);
 	font-weight: 600;
-	font-size: 12px;
+	font-size: 0.75rem;
 	letter-spacing: 0.2px;
 }
 
@@ -186,19 +186,21 @@ export default {
 			let cuvinte = this.textDictionar.split(/\s+/);
 
 			for (let i = 0; i < cuvinte.length; i++) {
-				let cuvant = cuvinte[i].toLowerCase().replace(/[^\w\ăîâșț]|[\d]/gi, '');
+				let cuvant = cuvinte[i].toLowerCase().replace(/[^\w\săîâșț]|[\d]/gi, '');
 
 				if (cuvant !== '') {
-					this.dictionary[cuvant] = true;
+					this.dictionary[this.normalizeDiacritics(cuvant)] = true;
 				}
 			}
 		},
+		contineDoarLitere(cuvant: string) {
+			return /^[\p{L}]+$/u.test(cuvant);
+		},
 		corectareText() {
 			this.correctedText = this.inputText;
-
-			this.correctedText = this.correctedText.replace(/\s+/g, " ");
-			this.correctedText = this.correctedText.replace(/([,.])(?!\s)/g, "$1 ");
-			this.correctedText = this.correctedText.replace(/\s+([,.])/g, "$1");
+			this.correctedText = this.correctedText.replace(/(?<=\S)([.,;:?!()[\]{}])/g, " $1 "); // Adauga un spatiu inainte si dupa caracterele speciale.
+			this.correctedText = this.correctedText.replace(/[\s\n]/g, " "); // Sterge liniile noi. 
+			this.correctedText = this.correctedText.replace(/\s{2,}/g, " "); // Sterge spatiile duble.
 
 			if (this.correctedText.length > 0) {
 				if (this.correctedText.charAt(0) === " ") {
@@ -207,7 +209,7 @@ export default {
 				if (this.correctedText.charAt(this.correctedText.length - 1) === " ") {
 					this.correctedText = this.correctedText.slice(0, -1);
 				}
-			}
+			}; // Elimina spatiul de la inceputul si sfarsitul textului.
 
 			let cuvinte = this.correctedText.split(" ");
 			let textCorectat = "";
@@ -215,19 +217,41 @@ export default {
 			for (let i = 0; i < cuvinte.length; i++) {
 				let cuvant = cuvinte[i].toLowerCase().replace(/[^\w\sșțâăî]]]|[\d]/gi, '');
 
-				if (this.dictionary[cuvant]) {
+				if (!this.contineDoarLitere(cuvant)) {
+					textCorectat += cuvinte[i];
+					continue;
+				};
+
+				if (this.dictionary[this.normalizeDiacritics(cuvant)]) {
 					textCorectat += cuvinte[i];
 				} else {
 					let cuvantCorectat = this.corecteazaCuvant(cuvant);
 					textCorectat += cuvantCorectat;
-				}
+				};
 
 				if (i < cuvinte.length - 1) {
 					textCorectat += " ";
-				}
-			}
+				};
+			};
 
-			this.correctedText = textCorectat.trim();
+			let regex = /(\s*)([.,;:?!()\[\]{}])(\s*)/g;
+			let rezultat = textCorectat.replace(regex, function(match, before, punct, after) {
+				var spaceBefore = before.length > 0 ? '' : ' ';
+				var spaceAfter = after.length > 0 ? '' : ' ';
+				return spaceBefore + punct + spaceAfter;
+			});
+
+			regex = /(^|[.!?]\s+)([a-zăâîșț])/g;
+			rezultat = rezultat.replace(regex, function(match, separator, litera) {
+				return separator + litera.toUpperCase();
+			});
+
+			rezultat = rezultat.replace(/\s{2,}/g, " ");
+			
+			this.correctedText = rezultat;
+		},
+		normalizeDiacritics(text: string) {
+			return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 		},
 		countWords() {
 			this.totalWords = this.inputText.match(/\s+/g)?.length || 0;
@@ -280,9 +304,7 @@ export default {
 	},
 	mounted() {
 		this.genereazaDictionar();
-		console.log(this.corecteazaCuvant("păcătooş"));
 
-		console.log(this.dictionary)
 	}
 };
 </script>
